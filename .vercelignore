@@ -1,5 +1,9 @@
 # Exclude large files and directories from Vercel deployment
 
+# Exclude the full version API and source files that import ML libraries
+api/app.py
+src/
+
 # Python
 __pycache__/
 *.py[cod]

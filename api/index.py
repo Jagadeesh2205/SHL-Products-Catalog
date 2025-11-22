@@ -1,29 +1,19 @@
 """
 Vercel-optimized Flask API for SHL Assessment Recommendation System
-Lightweight version with minimal memory footprint
+Lightweight version with minimal memory footprint - NO ML MODELS
 """
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-import sys
 import json
-import logging
-
-# Configure minimal logging
-logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger(__name__)
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
 
-# Global variables for lazy loading
+# Global variable for assessments cache
 _assessments = None
-_recommender = None
 
 
 def load_assessments():
@@ -34,25 +24,9 @@ def load_assessments():
             data_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'scraped_data.json')
             with open(data_path, 'r', encoding='utf-8') as f:
                 _assessments = json.load(f)
-            logger.info(f"Loaded {len(_assessments)} assessments")
         except Exception as e:
-            logger.error(f"Error loading assessments: {e}")
             _assessments = []
     return _assessments
-
-
-def get_recommender():
-    """Get recommender instance (lazy loading)"""
-    global _recommender
-    if _recommender is None:
-        try:
-            from src.recommender import RAGRecommender
-            _recommender = RAGRecommender()
-        except Exception as e:
-            logger.error(f"Error initializing recommender: {e}")
-            # Fallback to simple keyword matching
-            _recommender = SimpleRecommender()
-    return _recommender
 
 
 class SimpleRecommender:
@@ -117,7 +91,7 @@ def recommend():
         k = min(10, max(5, data.get('k', 10)))
         
         # Get recommender and generate recommendations
-        recommender = get_recommender()
+        recommender = SimpleRecommender()
         recommendations = recommender.recommend(query, k=k)
         
         # Format response (lightweight)
@@ -136,7 +110,6 @@ def recommend():
         return jsonify({'recommended_assessments': formatted}), 200
         
     except Exception as e:
-        logger.error(f"Error in recommend: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -155,3 +128,11 @@ def handler(request):
     """Vercel serverless function handler"""
     with app.request_context(request.environ):
         return app.full_dispatch_request()
+
+
+if __name__ == '__main__':
+    # For local testing
+    port = int(os.getenv('PORT', 5000))
+    print(f"Starting lightweight Flask API on port {port}")
+    print("Using keyword-based recommendation (no ML models)")
+    app.run(host='0.0.0.0', port=port, debug=True)

@@ -1,11 +1,5 @@
 # Minimal requirements for Vercel deployment
-# Core dependencies only to reduce bundle size
+# Keyword matching only - NO ML models
 
 flask==3.0.0
 flask-cors==4.0.0
-
-# Only if embeddings are pre-generated and committed
-# Otherwise use simple keyword matching fallback
-sentence-transformers==2.2.2
-faiss-cpu==1.8.0
-numpy==1.26.2
