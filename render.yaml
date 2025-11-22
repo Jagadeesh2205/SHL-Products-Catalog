@@ -1,0 +1,18 @@
+# Render.com deployment configuration
+# This file tells Render how to build and run your app
+
+services:
+  - type: web
+    name: shl-assessment-api
+    env: python
+    region: oregon
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn api.index:app --bind 0.0.0.0:$PORT --workers 1 --timeout 30
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PORT
+        value: 5000
+    healthCheckPath: /health
