@@ -1,11 +1,16 @@
-# Exclude large files and directories from Vercel deployment
+# Exclude ALL files that import heavy libraries or ML models
+# CRITICAL: Only api/index.py should be deployed
 
-# Exclude the full version API and source files that import ML libraries
+# Exclude the full version API
 api/app.py
-src/
 
-# Python
+# Exclude ALL source modules (they import ML libraries)
+src/
+src/**
+
+# Python cache and compiled files
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -13,6 +18,64 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+*.pyc
+
+# Exclude embeddings and large data files
+data/embeddings/
+data/embeddings/**
+*.npy
+*.index
+*.pkl
+*.pth
+*.pt
+*.bin
+*.h5
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed in production)
+*.md
+!README.md
+
+# Test files
+test_*.py
+*_test.py
+tests/
+
+# Excel files (source data not needed in production)
+*.xlsx
+*.xls
+
+# Environment files
+.env
+.env.local
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Additional Python files that might import heavy libraries
+run.py
+setup.py
+generate_*.py
+evaluate_*.py
 
 # Virtual environments
 venv/

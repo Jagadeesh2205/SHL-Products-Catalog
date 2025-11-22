@@ -1,0 +1,11 @@
+src/
+api/app.py
+__pycache__/
+*.pyc
+*.md
+tests/
+test_*.py
+data/embeddings/
+*.npy
+*.pkl
+*.index

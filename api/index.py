@@ -1,6 +1,6 @@
 """
 Vercel-optimized Flask API for SHL Assessment Recommendation System
-Lightweight version with minimal memory footprint - NO ML MODELS
+Ultra-minimal version - NO external imports from project
 """
 
 from flask import Flask, request, jsonify
@@ -12,122 +12,138 @@ import json
 app = Flask(__name__)
 CORS(app)
 
-# Global variable for assessments cache
-_assessments = None
+# Cache for assessments
+_assessments_cache = None
+
+
+def get_data_path():
+    """Get the absolute path to data file"""
+    # Try multiple possible locations
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), '..', 'data', 'scraped_data.json'),
+        os.path.join(os.getcwd(), 'data', 'scraped_data.json'),
+        '/var/task/data/scraped_data.json',  # Vercel Lambda path
+        'data/scraped_data.json'
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            return path
+    
+    return possible_paths[0]  # Default to first option
 
 
 def load_assessments():
-    """Load assessments from JSON file (lazy loading)"""
-    global _assessments
-    if _assessments is None:
-        try:
-            data_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'scraped_data.json')
-            with open(data_path, 'r', encoding='utf-8') as f:
-                _assessments = json.load(f)
-        except Exception as e:
-            _assessments = []
-    return _assessments
+    """Load assessments with error handling"""
+    global _assessments_cache
+    
+    if _assessments_cache is not None:
+        return _assessments_cache
+    
+    try:
+        data_path = get_data_path()
+        with open(data_path, 'r', encoding='utf-8') as f:
+            # Read in chunks to avoid memory issues
+            content = f.read()
+            _assessments_cache = json.loads(content)
+        return _assessments_cache
+    except Exception as e:
+        # Return empty list if can't load
+        return []
 
 
-class SimpleRecommender:
-    """Lightweight fallback recommender using keyword matching"""
+def simple_recommend(query, k=10):
+    """Ultra-simple keyword matching"""
+    assessments = load_assessments()
     
-    def __init__(self):
-        self.assessments = load_assessments()
+    if not assessments:
+        return []
     
-    def recommend(self, query: str, k: int = 10) -> list:
-        """Simple keyword-based recommendations"""
-        query_lower = query.lower()
-        words = set(query_lower.split())
+    query_lower = query.lower()
+    words = [w for w in query_lower.split() if len(w) > 3]
+    
+    # Score each assessment
+    scored = []
+    for assessment in assessments:
+        score = 0
+        text = f"{assessment.get('assessment_name', '')} {assessment.get('description', '')} {assessment.get('category', '')}".lower()
         
-        # Score each assessment
-        scored = []
-        for assessment in self.assessments:
-            score = 0
-            text = f"{assessment['assessment_name']} {assessment.get('description', '')} {assessment.get('category', '')}".lower()
-            
-            # Count word matches
-            for word in words:
-                if len(word) > 3 and word in text:
-                    score += 1
-            
-            if score > 0:
-                assessment_copy = assessment.copy()
-                assessment_copy['relevance_score'] = score
-                scored.append(assessment_copy)
+        # Simple word matching
+        for word in words:
+            if word in text:
+                score += text.count(word)
         
-        # Sort by score and return top k
-        scored.sort(key=lambda x: x['relevance_score'], reverse=True)
-        return scored[:k]
+        if score > 0:
+            scored.append((assessment, score))
+    
+    # Sort and return top k
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [item[0] for item in scored[:k]]
 
 
 @app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
+def health():
+    """Health check"""
     return jsonify({'status': 'healthy'}), 200
 
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
-    """
-    Assessment recommendation endpoint
-    Optimized for Vercel serverless functions
-    """
+    """Get recommendations"""
     try:
-        # Validate request
-        if not request.is_json:
-            return jsonify({'error': 'Request must be JSON'}), 400
-        
         data = request.get_json()
-        query = data.get('query', '').strip()
+        if not data:
+            return jsonify({'error': 'Invalid request'}), 400
         
+        query = data.get('query', '').strip()
         if not query or len(query) < 3:
             return jsonify({'error': 'Invalid query'}), 400
         
-        # Limit query length to prevent memory issues
-        query = query[:2000]
-        
-        # Get number of recommendations (5-10)
+        # Limit query length
+        query = query[:1000]
         k = min(10, max(5, data.get('k', 10)))
         
-        # Get recommender and generate recommendations
-        recommender = SimpleRecommender()
-        recommendations = recommender.recommend(query, k=k)
+        # Get recommendations
+        recommendations = simple_recommend(query, k)
         
-        # Format response (lightweight)
-        formatted = []
-        for rec in recommendations[:k]:
-            formatted.append({
+        # Format response
+        result = []
+        for rec in recommendations:
+            result.append({
                 'url': rec.get('url', ''),
                 'name': rec.get('assessment_name', ''),
                 'adaptive_support': rec.get('adaptive_support', 'No'),
-                'description': rec.get('description', '')[:200],  # Limit description length
+                'description': (rec.get('description', '') or '')[:150],
                 'duration': rec.get('duration', 0),
                 'remote_support': rec.get('remote_support', 'Yes'),
                 'test_type': [rec.get('test_type_full', rec.get('category', 'Other'))]
             })
         
-        return jsonify({'recommended_assessments': formatted}), 200
-        
-    except Exception as e:
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({'recommended_assessments': result}), 200
+    
+    except Exception:
+        return jsonify({'error': 'Internal error'}), 500
 
 
 @app.route('/api/info', methods=['GET'])
-def api_info():
-    """API information endpoint"""
+def info():
+    """API info"""
     return jsonify({
-        'name': 'SHL Assessment Recommendation API',
+        'name': 'SHL Assessment API',
         'version': '1.0.0',
         'status': 'operational'
     }), 200
 
 
-# Vercel serverless function handler
-def handler(request):
-    """Vercel serverless function handler"""
-    with app.request_context(request.environ):
-        return app.full_dispatch_request()
+# Vercel handler
+app_handler = app
+
+
+if __name__ == '__main__':
+    port = int(os.getenv('PORT', 5000))
+    print(f"Starting minimal Flask API on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=True)
+
 
 
 if __name__ == '__main__':
