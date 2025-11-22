@@ -1,6 +1,82 @@
 # Vercel Deployment Guide
 
+## ⚠️ IMPORTANT: Memory Issue Fix
+
+The original deployment failed with `ERR_OUT_OF_RANGE` error (4GB+ buffer) because:
+1. Sentence-transformer models are too large for serverless functions
+2. Loading all embeddings exceeds Vercel's memory limits
+3. Response payloads were too large
+
+**Solution**: We've created an optimized deployment with two options:
+
+### Option 1: Lightweight Mode (Recommended for Vercel Free Tier) ✅
+
+Uses simple keyword matching - no ML models, minimal memory:
+- Entry point: `api/index.py`
+- Dependencies: Flask + CORS only
+- Memory: <100MB
+- Fast cold starts
+- Perfect for free tier
+
+### Option 2: Full RAG Mode (Requires Vercel Pro)
+
+Uses sentence-transformers + FAISS:
+- Requires pre-generated embeddings
+- Memory: ~500MB-1GB
+- 60-second timeout needed
+- Better recommendation quality
+
+## Quick Start - Option 1 (Lightweight)
+
+This is already configured! Just deploy:
+
+1. **Push the latest changes**:
+   ```bash
+   git add .
+   git commit -m "Add Vercel-optimized deployment"
+   git push origin main
+   ```
+
+2. **Deploy to Vercel**:
+   - Go to [vercel.com](https://vercel.com)
+   - Import `SHL-Products-Catalog` repository
+   - Vercel will use `api/index.py` (lightweight version)
+   - Click Deploy
+
+3. **Test**:
+   ```bash
+   curl https://your-app.vercel.app/health
+   ```
+
 ## Changes Made for Vercel Compatibility
+
+### Latest Fixes (Memory Issue Resolution)
+
+1. **Created `api/index.py`**: Lightweight Flask app with:
+   - Lazy loading of data (loads only when needed)
+   - Simple keyword-based fallback recommender
+   - Limited response sizes (descriptions truncated to 200 chars)
+   - Query length limits (max 2000 chars)
+   - No large model loading
+
+2. **Created `requirements-vercel.txt`**: Minimal dependencies
+   - Only Flask and CORS required
+   - Optional ML packages commented out
+
+3. **Updated `vercel.json`**:
+   - Changed entry point to `api/index.py`
+   - Reduced maxLambdaSize to 15mb
+   - Set memory limit to 1024MB
+   - Added 10-second timeout (free tier)
+   - Added static file serving for frontend
+
+4. **Created `.vercelignore`**:
+   - Excludes embeddings folder
+   - Excludes documentation
+   - Excludes test files
+   - Reduces deployment size by ~90%
+
+### Previous Fixes
 
 1. **Updated `requirements.txt`**:
    - Changed `faiss-cpu==1.7.4` to `faiss-cpu==1.8.0` (compatible with Python 3.12)
