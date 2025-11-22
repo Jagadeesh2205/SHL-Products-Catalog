@@ -291,6 +291,5 @@ MIT License - Feel free to use this project for learning and development.
 
 ---
 
-**Built with ❤️ for the SHL GenAI Assessment**
 
 For more information, see the complete [Technical Approach Document](APPROACH.md).
